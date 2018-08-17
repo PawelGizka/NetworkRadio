@@ -105,6 +105,8 @@ void discover(std::atomic<int> &mainSession, std::atomic<int> &stationSelection,
                     stationSelection.store(0);
                     makeChangeUi = true;
                     mainSession++;
+                    if (debug) logger.log() << "radio station removed from list, restart\n" <<
+                                               "current time" << currentTime << " last seen " << station.lastSeen << std::endl;
                 } else if (i < stationSelection) {
                     stationSelection--;
                     makeChangeUi = true;
@@ -158,14 +160,29 @@ void discover(std::atomic<int> &mainSession, std::atomic<int> &stationSelection,
 
             radioStationsMutex.lock();
 
+            if (debug) {
+                logger.log() << "parsed mcast " << parsedMcast << std::endl;
+                logger.log() << "parsed name " << parsedName << std::endl;
+                logger.log() << "parsed port " << parsedPort << std::endl;
+            }
+
             bool found = false;
             time(&currentTime);
-            for (auto station : *radioStations) {
+            for (auto &station : *radioStations) {
+                if (debug) {
+                    logger.log() << "station mcast " << toString(station.address) << std::endl;
+                    logger.log() << "station name " << toString(station.name) << std::endl;
+                    logger.log() << "station port " << station.dataPort << std::endl;
+                }
+
                 if (toString(station.address) == parsedMcast
                     && station.dataPort == parsedPort
                     && toString(station.name) == parsedName) {
                     found = true;
                     station.lastSeen = currentTime;
+                    if (debug) logger.log() << "last seen updated for: " << station.name << " last seen: " << station.lastSeen << std::endl;
+                } else {
+                    if (debug) logger.log() << "stations data not match" << std::endl;
                 }
             }
             if (!found) {

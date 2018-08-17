@@ -1,6 +1,7 @@
 #include <atomic>
 #include <iostream>
 #include <fstream>
+#include <unistd.h>
 
 #include "../common/logger.h"
 #include "../common/debug.h"
@@ -19,9 +20,10 @@ int makeUpload(const char *packetBuffer, int psize, std::atomic<bool> *blocksRea
             break;
         }
         blocksReady[currentPacket % bufferSize].store(false);
+        write(1, (packetBuffer + ((currentPacket % bufferSize)*psize)), psize);
 
-        std::cout.write((packetBuffer + ((currentPacket % bufferSize)*psize)), psize);
         currentlyWritingPacket++;
+        if (debug) logger.log() << "packet: " << currentPacket << " writen to cout" << std::endl;
     }
 
     if (debug) logger.log() << "session ended, stopping cout uploader" << std::endl;

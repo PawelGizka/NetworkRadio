@@ -45,7 +45,7 @@ int main (int argc, char *argv[]) {
     int uiPort = 10000;
 
     //rozmiar w bajtach bufora, ustawiany parametrem -b odbiornika, domyślnie 64kB (65536B)
-    int bsize = 65536;
+    int bsize = 65536 * 8;
 
     //czas (w milisekundach) pomiędzy wysłaniem kolejnych raportów o brakujących paczkach
     // (dla odbiorników) oraz czas pomiędzy kolejnymi retransmisjami paczek, ustawiany parametrem -R, domyślnie 250.
@@ -189,6 +189,7 @@ int main (int argc, char *argv[]) {
 
             if (currentSessionId > sessionId) {
                 mainSession++;
+                if (debug) mainLogger.log() << "seesion id changed, restart" << std::endl;
                 break;
             }
 
@@ -198,6 +199,7 @@ int main (int argc, char *argv[]) {
 
             if (currentlyWritingPacket.load() + bufferSize < currentSegment) {
                 mainSession++;
+                if (debug) mainLogger.log() << "no place to store new segment, restart" << std::endl;
                 break;
             }
 

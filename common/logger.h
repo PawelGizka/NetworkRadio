@@ -13,6 +13,7 @@ public:
 
 private:
     std::ofstream fileToLog;
+    long lastWritten;
 
 };
 
