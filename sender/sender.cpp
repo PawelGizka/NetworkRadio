@@ -25,7 +25,7 @@
 
 #define TTL_VALUE     4
 
-const std::string LOOKUP("ZERO_SEVEN_COME_IN");
+const std::string LOOKUP("ZERO_SEVEN_COME_IN\n");
 const std::string REXMIT("LOUDER_PLEASE");
 
 void listenForControlData(
@@ -80,7 +80,7 @@ void listenForControlData(
         if (debug) logger.log() << "odebrano" << str << std::endl;
 
         if (str == LOOKUP) {
-            int length = snprintf (buffer, sizeof(buffer), "BOREWICZ_HERE %s %d %s",  mcast_addr.c_str(), dataPort, nazwa_stacji.c_str());
+            int length = snprintf (buffer, sizeof(buffer), "BOREWICZ_HERE %s %d %s\n",  mcast_addr.c_str(), dataPort, nazwa_stacji.c_str());
             std::string out(buffer);
             if (debug) logger.log() << "odebrano lookup" << out << std::endl;
             flags = 0;
@@ -192,7 +192,7 @@ int main(int argc, char* argv[]) {
 
     //port UDP używany do przesyłania danych, ustawiany parametrem -P nadajnika
     // domyślnie 20000 + (numer_albumu % 10000)
-    int dataPort = 10010;
+    int dataPort = 20000;
 
     //port UDP używany do transmisji pakietów kontrolnych, ustawiany parametrem -C
     // nadajnika i odbiornika, domyślnie 30000 + (numer_albumu % 10000)
@@ -202,14 +202,14 @@ int main(int argc, char* argv[]) {
     int psize = 512;
 
     // rozmiar w bajtach kolejki FIFO nadajnika, ustawiany parametrem -f nadajnika, domyślnie 128kB.
-    int fsize = 128000*16;
+    int fsize = 128000;
 
     //czas (w milisekundach) pomiędzy wysłaniem kolejnych raportów o brakujących paczkach
     // (dla odbiorników) oraz czas pomiędzy kolejnymi retransmisjami paczek, ustawiany parametrem -R, domyślnie 250.
     int rtime = 250;
 
     //nazwa to nazwa nadajnika, ustawiana parametrem -n, domyślnie "Nienazwany Nadajnik"
-    std::string nazwaRadia("Nienazwany Nadajnik");
+    std::string radioName("Nienazwany Nadajnik");
 
     InputParser input(argc, argv);
     if(!input.cmdOptionExists("-a")){
@@ -225,11 +225,6 @@ int main(int argc, char* argv[]) {
     option = input.getCmdOption("-P");
     if (!option.empty()){
         dataPort = std::stoi(option);
-    }
-
-    option = input.getCmdOption("-C");
-    if (!option.empty()){
-        ctrlPort = std::stoi(option);
     }
 
     option = input.getCmdOption("-C");
@@ -254,7 +249,7 @@ int main(int argc, char* argv[]) {
 
     option = input.getCmdOption("-n");
     if (!option.empty()){
-        nazwaRadia = option;
+        radioName = option;
     }
 
 
@@ -301,9 +296,9 @@ int main(int argc, char* argv[]) {
 
     uint64_t sessionId = time_buffer;
 
-    std::thread listener{[&end, multicastAddress, ctrlPort, dataPort, nazwaRadia, packetsToRetransmit, &packetsToRetransmitMutex]
+    std::thread listener{[&end, multicastAddress, ctrlPort, dataPort, radioName, packetsToRetransmit, &packetsToRetransmitMutex]
                          { listenForControlData(end, multicastAddress, ctrlPort, dataPort,
-                                                nazwaRadia, packetsToRetransmit, packetsToRetransmitMutex); }};
+                                                radioName, packetsToRetransmit, packetsToRetransmitMutex); }};
 
     std::thread retrasmitter{[&end, multicastAddress, dataPort, rtime, packetsToRetransmit, &packetsToRetransmitMutex,
                                      &currentPacket, fifoSize, fifo, fifoMutexes, psize, sessionId]

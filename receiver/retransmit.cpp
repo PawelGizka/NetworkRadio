@@ -65,6 +65,7 @@ void retransmit(std::atomic<int> &mainSession, int mySession, std::atomic<bool> 
     }
 
     if (count > 0) {
+        toSend.append("\n");
         write(sock, toSend.c_str(), toSend.length());
 
         std::thread([&mainSession, mySession, blocksReady, from, to, station, packetSize, rtime, byte0, bufferSize, &logger]

@@ -24,7 +24,7 @@
 #include "../common/debug.h"
 #include "radioStation.h"
 
-const char LOOKUP[] = "ZERO_SEVEN_COME_IN";
+const char LOOKUP[] = "ZERO_SEVEN_COME_IN\n";
 
 void discover(std::atomic<int> &mainSession, std::atomic<int> &stationSelection,
               std::string discover_addr, uint16_t controlPort, std::atomic<bool> &changeUi,
@@ -130,7 +130,6 @@ void discover(std::atomic<int> &mainSession, std::atomic<int> &stationSelection,
 
         if (bytes < 0) {
             if (errno == EAGAIN) {
-//                myfile << "Brak danych" << std::endl;
                 using namespace std::chrono_literals;
                 std::this_thread::sleep_for(100ms);
                 continue;
