@@ -23,8 +23,6 @@
 #include "../common/logger.h"
 #include "../common/debug.h"
 
-#define TTL_VALUE     4
-
 const std::string LOOKUP("ZERO_SEVEN_COME_IN\n");
 const std::string REXMIT("LOUDER_PLEASE");
 
@@ -40,12 +38,11 @@ void listenForControlData(
     socklen_t rcva_len;
     char buffer[1024];
 
-    /* otworzenie gniazda */
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0)
         syserr("socket");
 
-    // tryb nie blokujący
+    // non blodking
     int on = 1;
     ioctl(sock, FIONBIO, &on);
 
@@ -63,7 +60,6 @@ void listenForControlData(
                                  (struct sockaddr *) &client_address, &rcva_len);;
         if (bytes < 0) {
             if (errno == EAGAIN) {
-//                myfile << "Brak danych" << std::endl;
                 using namespace std::chrono_literals;
                 std::this_thread::sleep_for(100ms);
                 continue;
@@ -105,8 +101,6 @@ void listenForControlData(
 
     }
 
-
-    /* koniec */
     close(sock);
     exit(EXIT_SUCCESS);
 }
@@ -118,25 +112,16 @@ void retransmit(std::atomic<bool> &end, const std::string &mcast_addr,const int 
 
     logger logger("sender/retransmit");
 
-    /* zmienne i struktury opisujące gniazda */
     int sock, optval;
     struct sockaddr_in remote_address;
 
-    /* otworzenie gniazda */
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) syserr("socket");
 
-    /* uaktywnienie rozgłaszania (ang. broadcast) */
     optval = 1;
     if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void*)&optval, sizeof optval) < 0)
         syserr("setsockopt broadcast");
 
-    /* ustawienie TTL dla datagramów rozsyłanych do grupy */
-    optval = TTL_VALUE;
-    if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, (void*)&optval, sizeof optval) < 0)
-        syserr("setsockopt multicast ttl");
-
-    /* ustawienie adresu i portu odbiorcy */
     remote_address.sin_family = AF_INET;
     remote_address.sin_port = htons(data_port);
     if (inet_aton(mcast_addr.c_str(), &remote_address.sin_addr) == 0)
@@ -183,12 +168,14 @@ void retransmit(std::atomic<bool> &end, const std::string &mcast_addr,const int 
 
     }
 
+    close(sock);
+    exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char* argv[]) {
 
     //adres rozgłaszania ukierunkowanego, ustawiany obowiązkowym parametrem -a nadajnika
-    std::string multicastAddress("255.255.255.255");
+    std::string multicastAddress("239.0.0.1");
 
     //port UDP używany do przesyłania danych, ustawiany parametrem -P nadajnika
     // domyślnie 20000 + (numer_albumu % 10000)
@@ -252,26 +239,16 @@ int main(int argc, char* argv[]) {
         radioName = option;
     }
 
-
-    /* zmienne i struktury opisujące gniazda */
     int sock, optval;
     struct sockaddr_in remote_address;
 
-    /* otworzenie gniazda */
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) syserr("socket");
 
-    /* uaktywnienie rozgłaszania (ang. broadcast) */
     optval = 1;
     if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void*)&optval, sizeof optval) < 0)
         syserr("setsockopt broadcast");
 
-    /* ustawienie TTL dla datagramów rozsyłanych do grupy */
-    optval = TTL_VALUE;
-    if (setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, (void*)&optval, sizeof optval) < 0)
-        syserr("setsockopt multicast ttl");
-
-    /* ustawienie adresu i portu odbiorcy */
     remote_address.sin_family = AF_INET;
     remote_address.sin_port = htons(static_cast<uint16_t>(dataPort));
     if (inet_aton(multicastAddress.c_str(), &remote_address.sin_addr) == 0)
@@ -279,9 +256,7 @@ int main(int argc, char* argv[]) {
     if (connect(sock, (struct sockaddr *)&remote_address, sizeof remote_address) < 0)
         syserr("connect");
 
-    ////////////////////////////////////////////
-
-    std::atomic<bool> end(false); //informacja o zakonczeniu programu
+    std::atomic<bool> endOfProgram(false);
     auto *packetsToRetransmit = new std::set<uint64_t>;
     std::mutex packetsToRetransmitMutex;
 
@@ -296,25 +271,20 @@ int main(int argc, char* argv[]) {
 
     uint64_t sessionId = time_buffer;
 
-    std::thread listener{[&end, multicastAddress, ctrlPort, dataPort, radioName, packetsToRetransmit, &packetsToRetransmitMutex]
-                         { listenForControlData(end, multicastAddress, ctrlPort, dataPort,
+    std::thread listener{[&endOfProgram, multicastAddress, ctrlPort, dataPort, radioName, packetsToRetransmit, &packetsToRetransmitMutex]
+                         { listenForControlData(endOfProgram, multicastAddress, ctrlPort, dataPort,
                                                 radioName, packetsToRetransmit, packetsToRetransmitMutex); }};
 
-    std::thread retrasmitter{[&end, multicastAddress, dataPort, rtime, packetsToRetransmit, &packetsToRetransmitMutex,
+    std::thread retrasmitter{[&endOfProgram, multicastAddress, dataPort, rtime, packetsToRetransmit, &packetsToRetransmitMutex,
                                      &currentPacket, fifoSize, fifo, fifoMutexes, psize, sessionId]
-                             {retransmit(end, multicastAddress, dataPort, rtime, packetsToRetransmit, packetsToRetransmitMutex,
+                             {retransmit(endOfProgram, multicastAddress, dataPort, rtime, packetsToRetransmit, packetsToRetransmitMutex,
                                          currentPacket, fifoSize, fifo, fifoMutexes, psize, sessionId); }};
-
-    ///////////////////////////////////////////
 
     logger logger("sender/main");
 
-//    using namespace std::chrono_literals;
-//    std::this_thread::sleep_for(2s);
-
     char temp[psize + 16];
 
-    while (true) {
+    while (!std::cin.eof()) {
         std::cin.read((temp + 16), psize);
         *((uint64_t *) temp) = htobe64(sessionId);
         *((uint64_t *) (temp + 8)) = htobe64(currentPacket*psize);
@@ -331,6 +301,11 @@ int main(int argc, char* argv[]) {
 
         currentPacket++;
     }
+
+    endOfProgram.store(true);
+
+    close(sock);
+    exit(EXIT_SUCCESS);
 
     return 0;
 }
