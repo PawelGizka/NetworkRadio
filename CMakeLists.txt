@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.12)
-project(SIK_Radio)
+project(Network_Radio)
 
 find_package ( Threads REQUIRED )
 

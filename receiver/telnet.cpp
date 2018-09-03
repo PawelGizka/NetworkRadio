@@ -1,6 +1,3 @@
-//
-// Created by pawel on 13.06.18.
-//
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -64,7 +61,7 @@ int isDown(int length, char buffer[]) {
 }
 
 
-int telnet(int uiPort, std::atomic<int> &mainSession, std::atomic<bool> &changeUi, std::atomic<int> &stationSelection,
+void telnet(int uiPort, std::atomic<int> &mainSession, std::atomic<bool> &changeUi, std::atomic<unsigned int> &stationSelection,
            std::vector<RadioStation> *radioStations, std::mutex &radioStationsMutex) {
 
     bool finish = false;
@@ -76,13 +73,6 @@ int telnet(int uiPort, std::atomic<int> &mainSession, std::atomic<bool> &changeU
     ssize_t rval;
     int msgsock, activeClients, i, ret;
 
-    /* Po Ctrl-C kończymy */
-//    if (signal(SIGINT, catch_int) == SIG_ERR) {
-//        perror("Unable to change signal handler");
-//        exit(EXIT_FAILURE);
-//    }
-
-    /* Inicjujemy tablicę z gniazdkami klientów, client[0] to gniazdko centrali */
     for (i = 0; i < _POSIX_OPEN_MAX; ++i) {
         client[i].fd = -1;
         client[i].events = POLLIN;
@@ -90,14 +80,12 @@ int telnet(int uiPort, std::atomic<int> &mainSession, std::atomic<bool> &changeU
     }
     activeClients = 0;
 
-    /* Tworzymy gniazdko centrali */
     client[0].fd = socket(PF_INET, SOCK_STREAM, 0);
     if (client[0].fd < 0) {
         perror("Opening stream socket");
         exit(EXIT_FAILURE);
     }
 
-    /* Co do adresu nie jesteśmy wybredni */
     server.sin_family = AF_INET;
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port = htons(uiPort);
@@ -107,7 +95,6 @@ int telnet(int uiPort, std::atomic<int> &mainSession, std::atomic<bool> &changeU
         exit(EXIT_FAILURE);
     }
 
-    /* Dowiedzmy się, jaki to port i obwieśćmy to światu */
     length = sizeof(server);
     if (getsockname (client[0].fd, (struct sockaddr*)&server,
                      (socklen_t*)&length) < 0) {
@@ -115,19 +102,16 @@ int telnet(int uiPort, std::atomic<int> &mainSession, std::atomic<bool> &changeU
         exit(EXIT_FAILURE);
     }
 
-    /* Zapraszamy klientów */
     if (listen(client[0].fd, 3) == -1) {
         perror("Starting to listen");
         exit(EXIT_FAILURE);
     }
 
-    /* Do pracy */
     std::vector<RadioStation> currentStations;
     do {
         for (i = 0; i < _POSIX_OPEN_MAX; ++i)
             client[i].revents = 0;
 
-        /* Po Ctrl-C zamykamy gniazdko centrali */
         if (finish && client[0].fd >= 0) {
             if (close(client[0].fd) < 0)
                 perror("close");
@@ -146,8 +130,6 @@ int telnet(int uiPort, std::atomic<int> &mainSession, std::atomic<bool> &changeU
             }
         }
 
-
-        /* Czekamy przez 100 ms */
         ret = poll(client, _POSIX_OPEN_MAX, 100);
         if (ret < 0)
             perror("poll");
@@ -163,7 +145,7 @@ int telnet(int uiPort, std::atomic<int> &mainSession, std::atomic<bool> &changeU
                             activeClients += 1;
 
                             unsigned char initMessage[] = {255, 251, 1}; //IAC WILL ECHO
-                            size_t expected_len = sizeof(initMessage) / sizeof(char);
+                            ssize_t expected_len = sizeof(initMessage) / sizeof(char);
                             ssize_t write_len = write(msgsock, initMessage, expected_len);
 
                             if (expected_len != write_len) syserr("write to socket");
@@ -220,7 +202,5 @@ int telnet(int uiPort, std::atomic<int> &mainSession, std::atomic<bool> &changeU
         }
 
     } while (!finish);
-
-    return 0;
 }
 

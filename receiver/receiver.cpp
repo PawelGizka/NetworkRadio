@@ -32,24 +32,20 @@
 
 int main (int argc, char *argv[]) {
 
-    //adres używany przez odbiornik do wykrywania aktywnych nadajników,
-    //ustawiany parametrem -d odbiornika, domyślnie 255.255.255.255
+    //-d
     std::string discoverAddress("255.255.255.255");
 
-    //port UDP używany do transmisji pakietów kontrolnych, ustawiany parametrem -C
-    // nadajnika i odbiornika, domyślnie 30000 + (numer_albumu % 10000)
+    //-C
     int ctrlPort = 30000;
 
-    //port TCP, na którym udostępniany jest prosty interfejs tekstowy do przełączania się między stacjami,
-    // domyślnie 10000 + (numer_albumu % 10000); ustawiany parametrem -U odbiornika
-    int uiPort = 10000;
+    //telnet ui port, -U option
+    int telnetUiPort = 10000;
 
-    //rozmiar w bajtach bufora, ustawiany parametrem -b odbiornika, domyślnie 64kB (65536B)
+    //-b, buffer size
     int bsize = 65536 * 8;
 
-    //czas (w milisekundach) pomiędzy wysłaniem kolejnych raportów o brakujących paczkach
-    // (dla odbiorników) oraz czas pomiędzy kolejnymi retransmisjami paczek, ustawiany parametrem -R, domyślnie 250.
-    int rtime = 250;
+    //-R, wait time for retransmit packets (miliseconds)
+    int retransmitTime = 250;
 
     InputParser input(argc, argv);
 
@@ -65,7 +61,7 @@ int main (int argc, char *argv[]) {
 
     option = input.getCmdOption("-U");
     if (!option.empty()){
-        uiPort = std::stoi(option);
+        telnetUiPort = std::stoi(option);
     }
 
     option = input.getCmdOption("-b");
@@ -75,12 +71,9 @@ int main (int argc, char *argv[]) {
 
     option = input.getCmdOption("-R");
     if (!option.empty()){
-        rtime = std::stoi(option);
+        retransmitTime = std::stoi(option);
     }
 
-
-    /* zmienne i struktury opisujące gniazda */
-    ////////////////////////
     char *packetBuffer = new char[bsize];
 
     std::vector<RadioStation> *radioStations = new std::vector<RadioStation>;
@@ -89,19 +82,16 @@ int main (int argc, char *argv[]) {
     std::atomic<int> mainSession(0);//any change to mainSession results in again playback
 
     std::atomic<bool> changeUi(true);
-    std::atomic<int> stationSelection(0);
+    std::atomic<unsigned int> stationSelection(0);
 
     std::atomic<uint64_t > currentlyWritingPacket(0);
 
     std::thread listenerThread{[&mainSession, &stationSelection, discoverAddress, ctrlPort, &changeUi, radioStations, &radioStationsMutex]
                                { discover(mainSession, stationSelection, discoverAddress, ctrlPort, changeUi, radioStations, radioStationsMutex); }};
 
-    std::thread telnetThread{[uiPort, &mainSession, &changeUi, &stationSelection, radioStations, &radioStationsMutex]
-                             { telnet(uiPort, mainSession, changeUi, stationSelection, radioStations, radioStationsMutex); }};
+    std::thread telnetThread{[telnetUiPort, &mainSession, &changeUi, &stationSelection, radioStations, &radioStationsMutex]
+                             { telnet(telnetUiPort, mainSession, changeUi, stationSelection, radioStations, radioStationsMutex); }};
 
-    ///////////////
-
-    /* czytanie tego, co odebrano */
     bool finishIt = false;
 
     logger mainLogger("receiver/main");
@@ -154,7 +144,6 @@ int main (int argc, char *argv[]) {
 
         char temp[bsize];
         ssize_t rcv_len;
-        int i;
 
         rcv_len = read(sock, (void*) temp, sizeof temp);
         ssize_t packetSize = rcv_len - 16;
@@ -166,7 +155,7 @@ int main (int argc, char *argv[]) {
         std::atomic<bool> *blocksReady = new std::atomic<bool>[bufferSize];
 
         blocksReady[0].store(true);
-        for (int i = 1; i < bufferSize; i++) {
+        for (unsigned int i = 1; i < bufferSize; i++) {
             blocksReady[i].store(false);
         }
 
@@ -212,8 +201,8 @@ int main (int argc, char *argv[]) {
                 uint64_t to = currentSegment - 1; //inclusive
                 lastRetransmitSegment = to;
 
-                std::thread([&mainSession, currentMainSession, blocksReady, from, to, currentRadioStation, packetSize, rtime, byte0, bufferSize, &retransmitLogger]
-                            { retransmit(mainSession, currentMainSession, blocksReady, from, to, currentRadioStation, packetSize, rtime, byte0, bufferSize, retransmitLogger); }).detach();
+                std::thread([&mainSession, currentMainSession, blocksReady, from, to, currentRadioStation, packetSize, retransmitTime, byte0, bufferSize, &retransmitLogger]
+                            { retransmit(mainSession, currentMainSession, blocksReady, from, to, currentRadioStation, packetSize, retransmitTime, byte0, bufferSize, retransmitLogger); }).detach();
 
             }
 
@@ -251,6 +240,5 @@ int main (int argc, char *argv[]) {
 
     }
 
-//    close(sock);
     exit(EXIT_SUCCESS);
 }

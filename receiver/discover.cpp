@@ -26,7 +26,7 @@
 
 const char LOOKUP[] = "ZERO_SEVEN_COME_IN\n";
 
-void discover(std::atomic<int> &mainSession, std::atomic<int> &stationSelection,
+void discover(std::atomic<int> &mainSession, std::atomic<unsigned int> &stationSelection,
               std::string discover_addr, uint16_t controlPort, std::atomic<bool> &changeUi,
               std::vector<RadioStation> *radioStations, std::mutex &radioStationsMutex) {
 
@@ -35,15 +35,15 @@ void discover(std::atomic<int> &mainSession, std::atomic<int> &stationSelection,
     int sock, optval;
     struct sockaddr_in remote_address;
 
-    /* otworzenie gniazda */
+    //open socket
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) syserr("socket");
 
-    // tryb nie blokujący
+    //non blocking
     int on = 1;
     ioctl(sock, FIONBIO, &on);
 
-    /* uaktywnienie rozgłaszania (ang. broadcast) */
+    //activate broadcast
     optval = 1;
     if (setsockopt(sock, SOL_SOCKET, SO_BROADCAST, (void*)&optval, sizeof optval) < 0)
         syserr("setsockopt broadcast");
@@ -52,7 +52,6 @@ void discover(std::atomic<int> &mainSession, std::atomic<int> &stationSelection,
     if (setsockopt(sock, SOL_IP, IP_MULTICAST_LOOP, (void*)&optval, sizeof optval) < 0)
         syserr("setsockopt loop");
 
-    /* podpięcie się pod lokalny adres i port */
     struct sockaddr_in local_address;
     struct sockaddr_in client_address;
     socklen_t rcva_len;
@@ -62,8 +61,8 @@ void discover(std::atomic<int> &mainSession, std::atomic<int> &stationSelection,
     local_address.sin_port = htons(0);
     if (bind(sock, (struct sockaddr *)&local_address, sizeof local_address) < 0)
         syserr("bind");
-//
-//    /* ustawienie adresu i portu odbiorcy */
+
+    //set receiver address and port
     remote_address.sin_family = AF_INET;
     remote_address.sin_port = htons(controlPort);
     if (inet_aton(discover_addr.c_str(), &remote_address.sin_addr) == 0)
@@ -96,7 +95,7 @@ void discover(std::atomic<int> &mainSession, std::atomic<int> &stationSelection,
 
             radioStationsMutex.lock();
             std::vector<RadioStation> newRadioStations;
-            int i = 0;
+            unsigned int i = 0;
             bool makeChangeUi = false;
             for (auto station : *radioStations) {
                 if ((currentTime - station.lastSeen) <= 20) {
@@ -152,7 +151,7 @@ void discover(std::atomic<int> &mainSession, std::atomic<int> &stationSelection,
             char mcast[20];
             int dataBig;
             char name[64];
-            sscanf(buffer, "%*s %s %d %64[^\n]%c", mcast, &dataBig, name);
+            sscanf(buffer, "%*s %s %d %64[^\n]", mcast, &dataBig, name);
 
             std::string parsedMcast(mcast);
             std::string parsedName(name);

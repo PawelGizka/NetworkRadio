@@ -1,5 +1,5 @@
-#ifndef SIK_RADIO_LOGGER_H
-#define SIK_RADIO_LOGGER_H
+#ifndef LOGGER_H
+#define LOGGER_H
 
 #include <string>
 #include <fstream>
@@ -17,4 +17,4 @@ private:
 
 };
 
-#endif //SIK_RADIO_LOGGER_H
+#endif

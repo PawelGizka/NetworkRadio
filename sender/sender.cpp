@@ -42,11 +42,10 @@ void listenForControlData(
     if (sock < 0)
         syserr("socket");
 
-    // non blodking
+    // non blocking
     int on = 1;
     ioctl(sock, FIONBIO, &on);
 
-    /* podpięcie się pod lokalny adres i port */
     local_address.sin_family = AF_INET;
     local_address.sin_addr.s_addr = htonl(INADDR_ANY);
     local_address.sin_port = htons(controlPort);
@@ -160,7 +159,7 @@ void retransmit(std::atomic<bool> &end, const std::string &mcast_addr,const int 
                     if (debug) logger.log() << "packet " << packet << " little late to retransmit" << std::endl;
                 }
             } else {
-//                packet is to old
+                //packet is to old
                 if (debug) logger.log() << "packet " << packet << " to old to retransmit" << std::endl;
             }
 
@@ -174,29 +173,26 @@ void retransmit(std::atomic<bool> &end, const std::string &mcast_addr,const int 
 
 int main(int argc, char* argv[]) {
 
-    //adres rozgłaszania ukierunkowanego, ustawiany obowiązkowym parametrem -a nadajnika
+    //-a
     std::string multicastAddress("239.0.0.1");
 
-    //port UDP używany do przesyłania danych, ustawiany parametrem -P nadajnika
-    // domyślnie 20000 + (numer_albumu % 10000)
+    //-P
     int dataPort = 20000;
 
-    //port UDP używany do transmisji pakietów kontrolnych, ustawiany parametrem -C
-    // nadajnika i odbiornika, domyślnie 30000 + (numer_albumu % 10000)
+    //-C, used for control packet transmission
     int ctrlPort = 30000;
 
-    //rozmiar w bajtach paczki, ustawiany parametrem -p nadajnika, domyślnie 512B
-    int psize = 512;
+    //-p
+    int packetSize = 512;
 
-    // rozmiar w bajtach kolejki FIFO nadajnika, ustawiany parametrem -f nadajnika, domyślnie 128kB.
-    int fsize = 128000;
+    //-f
+    int fifoQueueSize = 128000;
 
-    //czas (w milisekundach) pomiędzy wysłaniem kolejnych raportów o brakujących paczkach
-    // (dla odbiorników) oraz czas pomiędzy kolejnymi retransmisjami paczek, ustawiany parametrem -R, domyślnie 250.
-    int rtime = 250;
+    //-R, time (in miliseconds) between packets retransmission
+    int retransmitTime = 250;
 
-    //nazwa to nazwa nadajnika, ustawiana parametrem -n, domyślnie "Nienazwany Nadajnik"
-    std::string radioName("Nienazwany Nadajnik");
+    //-n
+    std::string radioName("No name sender");
 
     InputParser input(argc, argv);
     if(!input.cmdOptionExists("-a")){
@@ -221,17 +217,17 @@ int main(int argc, char* argv[]) {
 
     option = input.getCmdOption("-p");
     if (!option.empty()){
-        psize = std::stoi(option);
+        packetSize = std::stoi(option);
     }
 
     option = input.getCmdOption("-f");
     if (!option.empty()){
-        fsize = std::stoi(option);
+        fifoQueueSize = std::stoi(option);
     }
 
     option = input.getCmdOption("-R");
     if (!option.empty()){
-        rtime = std::stoi(option);
+        retransmitTime = std::stoi(option);
     }
 
     option = input.getCmdOption("-n");
@@ -260,8 +256,8 @@ int main(int argc, char* argv[]) {
     auto *packetsToRetransmit = new std::set<uint64_t>;
     std::mutex packetsToRetransmitMutex;
 
-    auto fifoSize = static_cast<uint64_t>(floor(fsize / psize));
-    auto *fifo = new char[fifoSize * psize];
+    auto fifoSize = static_cast<uint64_t>(floor(fifoQueueSize / packetSize));
+    auto *fifo = new char[fifoSize * packetSize];
     std::atomic<uint64_t> currentPacket(0);
 
     auto *fifoMutexes = new std::mutex[fifoSize];
@@ -275,29 +271,29 @@ int main(int argc, char* argv[]) {
                          { listenForControlData(endOfProgram, multicastAddress, ctrlPort, dataPort,
                                                 radioName, packetsToRetransmit, packetsToRetransmitMutex); }};
 
-    std::thread retrasmitter{[&endOfProgram, multicastAddress, dataPort, rtime, packetsToRetransmit, &packetsToRetransmitMutex,
-                                     &currentPacket, fifoSize, fifo, fifoMutexes, psize, sessionId]
-                             {retransmit(endOfProgram, multicastAddress, dataPort, rtime, packetsToRetransmit, packetsToRetransmitMutex,
-                                         currentPacket, fifoSize, fifo, fifoMutexes, psize, sessionId); }};
+    std::thread retrasmitter{[&endOfProgram, multicastAddress, dataPort, retransmitTime, packetsToRetransmit, &packetsToRetransmitMutex,
+                                     &currentPacket, fifoSize, fifo, fifoMutexes, packetSize, sessionId]
+                             {retransmit(endOfProgram, multicastAddress, dataPort, retransmitTime, packetsToRetransmit, packetsToRetransmitMutex,
+                                         currentPacket, fifoSize, fifo, fifoMutexes, packetSize, sessionId); }};
 
     logger logger("sender/main");
 
-    char temp[psize + 16];
+    char temp[packetSize + 16];
 
     while (!std::cin.eof()) {
-        std::cin.read((temp + 16), psize);
+        std::cin.read((temp + 16), packetSize);
         *((uint64_t *) temp) = htobe64(sessionId);
-        *((uint64_t *) (temp + 8)) = htobe64(currentPacket*psize);
+        *((uint64_t *) (temp + 8)) = htobe64(currentPacket * packetSize);
 
-        write(sock, temp, psize + 16);
+        write(sock, temp, packetSize + 16);
 
         fifoMutexes[currentPacket % fifoSize].lock();
-        for (int j = 0; j < psize; j++) {
-            fifo[((currentPacket % fifoSize) * psize) + j] = temp[j + 16];
+        for (int j = 0; j < packetSize; j++) {
+            fifo[((currentPacket % fifoSize) * packetSize) + j] = temp[j + 16];
         }
         fifoMutexes[currentPacket % fifoSize].unlock();
 
-        if (debug) logger.log() << "send packet: " << (currentPacket*psize) << std::endl;
+        if (debug) logger.log() << "send packet: " << (currentPacket * packetSize) << std::endl;
 
         currentPacket++;
     }

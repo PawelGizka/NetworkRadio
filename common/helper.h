@@ -1,10 +1,5 @@
-//
-// Created by pawel on 12.06.18.
-
-
-//
-#ifndef NADAJNIK_HELPER_H
-#define NADAJNIK_HELPER_H
+#ifndef HELPER_H
+#define HELPER_H
 
 #include <string>
 #include <set>
@@ -25,4 +20,4 @@ public:
     bool cmdOptionExists(const std::string &option) const;
 };
 
-#endif //NADAJNIK_HELPER_H
+#endif

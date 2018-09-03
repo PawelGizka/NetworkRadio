@@ -11,9 +11,6 @@
 #include "../common/debug.h"
 #include "radioStation.h"
 
-//
-// Created by pawel on 13.06.18.
-//
 void retransmit(std::atomic<int> &mainSession, int mySession, std::atomic<bool> *blocksReady,
                 int from, int to, struct RadioStation station, int packetSize, int rtime, uint64_t byte0,
                 uint64_t bufferSize, logger &logger) {
@@ -27,14 +24,12 @@ void retransmit(std::atomic<int> &mainSession, int mySession, std::atomic<bool> 
         return;
     }
 
-    int sock, optval;
+    int sock;
     struct sockaddr_in remote_address;
 
-    /* otworzenie gniazda */
     sock = socket(AF_INET, SOCK_DGRAM, 0);
     if (sock < 0) syserr("socket");
 
-    /* ustawienie adresu i portu odbiorcy */
     remote_address.sin_family = AF_INET;
     remote_address.sin_port = station.sin_port;
     remote_address.sin_addr = station.sin_addr;
@@ -54,7 +49,7 @@ void retransmit(std::atomic<int> &mainSession, int mySession, std::atomic<bool> 
             }
 
             char buffer[1024];
-            int length = snprintf (buffer, sizeof(buffer), "%" PRIu64 ,  i*packetSize + byte0);
+            snprintf (buffer, sizeof(buffer), "%" PRIu64 ,  i*packetSize + byte0);
             std::string parsed(buffer);
             toSend.append(parsed);
 

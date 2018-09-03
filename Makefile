@@ -1,7 +1,7 @@
 CC = g++
 CFLAGS = -Wall -g -std=c++14 -pthread
 
-all: sikradio-sender sikradio-receiver
+all: radio-sender radio-receiver
 
 #common
 
@@ -19,8 +19,8 @@ logger.o: common/logger.cpp
 sender.o: sender/sender.cpp
 	$(CC) $(CFLAGS) -o sender.o -c sender/sender.cpp
 
-sikradio-sender: err.o helper.o logger.o sender.o
-	$(CC) $(CFLAGS) -o sikradio-sender err.o helper.o logger.o sender.o
+radio-sender: err.o helper.o logger.o sender.o
+	$(CC) $(CFLAGS) -o radio-sender err.o helper.o logger.o sender.o
 
 #receiver
 
@@ -39,8 +39,8 @@ telnet.o: receiver/telnet.cpp
 receiver.o: receiver/receiver.cpp
 	$(CC) $(CFLAGS) -o receiver.o -c receiver/receiver.cpp
 
-sikradio-receiver: err.o helper.o logger.o discover.o outUploader.o retransmit.o telnet.o receiver.o
-	$(CC) $(CFLAGS) -o sikradio-receiver err.o helper.o logger.o discover.o outUploader.o retransmit.o telnet.o receiver.o
+radio-receiver: err.o helper.o logger.o discover.o outUploader.o retransmit.o telnet.o receiver.o
+	$(CC) $(CFLAGS) -o radio-receiver err.o helper.o logger.o discover.o outUploader.o retransmit.o telnet.o receiver.o
 
 clean:
 	rm err.o
